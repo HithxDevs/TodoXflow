@@ -1,3 +1,4 @@
+import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { compare } from "bcryptjs";
@@ -5,7 +6,7 @@ import { PrismaClient } from "@/app/generated/prisma";
 
 const prisma = new PrismaClient();
 
-export const authOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     // Credentials Provider for email/password login
     CredentialsProvider({
@@ -17,23 +18,28 @@ export const authOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        // Find user in DB
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
+        try {
+          // Find user in DB
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          });
 
-        if (!user || !user.password) return null;
+          if (!user || !user.password) return null;
 
-        const isPasswordCorrect = await compare(credentials.password, user.password);
+          const isPasswordCorrect = await compare(credentials.password, user.password);
 
-        if (!isPasswordCorrect) return null;
+          if (!isPasswordCorrect) return null;
 
-        // Return only essential fields (for JWT/session)
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name
-        };
+          // Return only essential fields (for JWT/session)
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name
+          };
+        } catch (error) {
+          console.error("Authorization error:", error);
+          return null;
+        }
       },
     }),
     
@@ -54,20 +60,22 @@ export const authOptions = {
   
   callbacks: {
     // Handle sign-in logic for different providers
-    async signIn({ user, account }: { user: import("next-auth").User; account: import("next-auth").Account | null }) {
+    async signIn({ user, account }) {
       try {
         // Handle Google sign-in
         if (account?.provider === "google") {
+          if (!user.email) return false;
+
           // Check if user already exists
           const existingUser = await prisma.user.findUnique({
-            where: { email: user.email! },
+            where: { email: user.email },
           });
 
           if (!existingUser) {
             // Create new user from Google data
             await prisma.user.create({
               data: {
-                email: user.email!,
+                email: user.email,
                 name: user.name || "Google User",
                 // No password for Google users - they authenticate via Google
               },
@@ -75,7 +83,7 @@ export const authOptions = {
           } else {
             // Update existing user's Google info if needed
             await prisma.user.update({
-              where: { email: user.email! },
+              where: { email: user.email },
               data: {
                 name: user.name || existingUser.name
               },
@@ -91,29 +99,21 @@ export const authOptions = {
     },
 
     // JWT callback - runs whenever JWT is accessed
-    async jwt({ token, user }: { token: import("next-auth/jwt").JWT; user?: import("next-auth").User }) {
-      // Define a type for the user object
-      type JWTUser = {
-        id?: string;
-        email?: string;
-        name?: string;
-      };
-
+    async jwt({ token, user }) {
       // If this is the first time JWT is created (user just signed in)
       if (user) {
         token.user = {
           id: user.id,
           email: user.email,
           name: user.name
-        } as JWTUser;
+        };
       }
 
       // For subsequent requests, get fresh user data from DB
-      const jwtUser = token.user as JWTUser | undefined;
-      if (jwtUser?.email) {
+      if (token.user && typeof token.user === 'object' && 'email' in token.user) {
         try {
           const dbUser = await prisma.user.findUnique({
-            where: { email: jwtUser.email },
+            where: { email: token.user.email as string },
             select: {
               id: true,
               email: true,
@@ -133,14 +133,14 @@ export const authOptions = {
     },
 
     // Session callback - runs when session is accessed
-    async session({ session, token }: { session: import("next-auth").Session; token: import("next-auth/jwt").JWT }) {
+    async session({ session, token }) {
       // Pass user data from JWT to session
-      const user = token.user as { id?: string; email?: string; name?: string } | undefined;
-      if (user) {
+      if (token.user && typeof token.user === 'object') {
+        const user = token.user as { id?: string; email?: string; name?: string };
         session.user = {
-          id: user.id ?? "",
-          email: user.email ?? "",
-          name: user.name ?? null,
+          id: user.id || "",
+          email: user.email || "",
+          name: user.name || null,
         };
       }
       
@@ -148,16 +148,5 @@ export const authOptions = {
     },
   },
   
-//   events: {
-//     // Optional: Log sign-in events
-//     async signIn({ user, account }: { user: import("next-auth").User; account: import("next-auth").Account | null }) {
-//       console.log(`User ${user.email} signed in with ${account?.provider}`);
-//     },
-    
-//     async signOut() {
-//       console.log(`User signed out`);
-//     },
-//   },
-  
   secret: process.env.NEXTAUTH_SECRET,
-}
+};
