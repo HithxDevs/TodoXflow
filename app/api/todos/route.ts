@@ -8,6 +8,7 @@ const prisma = new PrismaClient()
 // GET all todos for authenticated user
 export async function GET() {
   try {
+    // @ts-expect-error: getServerSession overload without request is missing in types
     const session = await getServerSession(authOptions) as { user?: { email?: string } } | null;
     
     if (!session?.user?.email) {
@@ -39,6 +40,7 @@ export async function GET() {
 // POST - Create new todo
 export async function POST(request: NextRequest) {
   try {
+    // @ts-expect-error: getServerSession overload without request is missing in types
     const session = await getServerSession(authOptions) as { user?: { email?: string } } | null;
     
     if (!session?.user?.email) {
@@ -86,6 +88,7 @@ export async function POST(request: NextRequest) {
 // PATCH - Update todo status
 export async function PATCH(request: NextRequest) {
   try {
+    // @ts-expect-error: getServerSession overload without request is missing in types
     const session = await getServerSession(authOptions) as { user?: { email?: string } } | null;
     
     if (!session?.user?.email) {
