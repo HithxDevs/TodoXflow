@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
-import { handler as authOptions } from "../auth/[...nextauth]/route"
 import { PrismaClient } from "@/app/generated/prisma"
 
 const prisma = new PrismaClient()
@@ -8,7 +7,7 @@ const prisma = new PrismaClient()
 // GET all todos for authenticated user
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions) as { user?: { email?: string } } | null;
+    const session = await getServerSession() as { user?: { email?: string } } | null;
     
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -39,7 +38,7 @@ export async function GET() {
 // POST - Create new todo
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions) as { user?: { email?: string } } | null;
+    const session = await getServerSession() as { user?: { email?: string } } | null;
     
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -86,7 +85,7 @@ export async function POST(request: NextRequest) {
 // PATCH - Update todo status
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions) as { user?: { email?: string } } | null;
+    const session = await getServerSession() as { user?: { email?: string } } | null;
     
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

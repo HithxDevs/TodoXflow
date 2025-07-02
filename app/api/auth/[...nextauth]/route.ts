@@ -18,7 +18,7 @@ declare module "next-auth" {
 
 const prisma = new PrismaClient();
 
-export const handler = NextAuth({
+const handler = NextAuth({
   providers: [
     // Credentials Provider for email/password login
     CredentialsProvider({
